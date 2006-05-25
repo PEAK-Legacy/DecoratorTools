@@ -1,8 +1,8 @@
 Class, Function, and Assignment Decorators for Python 2.3+
 ==========================================================
 
-Want to use decorators, but you still need to support Python 2.3?  Wish you
-could have class decorators, or decorate arbitrary assignments?  Then you need
+Want to use decorators, but still need to support Python 2.3?  Wish you could
+have class decorators, or decorate arbitrary assignments?  Then you need
 "DecoratorTools".  Some quick examples::
 
     # Method decorator example
