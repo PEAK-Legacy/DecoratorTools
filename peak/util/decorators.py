@@ -68,17 +68,17 @@ def struct(*mixins, **kw):
     entries take precedence over any default entries (e.g. methods, properties,
     docstring, etc.) that are created by the ``struct()`` decorator.
     """
-
     def callback(frame, name, func, old_locals):
 
         def __new__(cls, *args, **kw):
             result = func(*args, **kw)
-            return tuple.__new__(cls, result)
+            if type(result) is tuple:
+                return tuple.__new__(cls, result)
+            else:
+                return result
 
         def __repr__(self):
             return name+tuple.__repr__(self)
-
-
 
         import inspect
         args, star, dstar, defaults = inspect.getargspec(func)

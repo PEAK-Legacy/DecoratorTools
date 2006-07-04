@@ -227,6 +227,20 @@ a ``__dict__`` attribute, unless they are new-style classes that set
 conflicts.  In general, it's best to use mixins only for adding methods, not
 data.
 
+Finally, note that if your function returns a non-tuple result, it will be
+returned from the class' constructor.  This is sometimes useful::
+
+    >>> def And(a, b):
+    ...     if a is None: return b
+    ...     return a, b
+    >>> And = struct()(And)
+
+    >>> And(1,2)
+    And(1, 2)
+
+    >>> And(None, 27)
+    27
+
 
 Advanced Decorators
 -------------------
