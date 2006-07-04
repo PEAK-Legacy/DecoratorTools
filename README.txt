@@ -1,6 +1,9 @@
 Class, Function, and Assignment Decorators for Python 2.3+
 ==========================================================
 
+(NEW in 1.1: The ``struct()`` decorator makes it easy to create tuple-like data
+structure types, by decorating a constructor function.)
+
 Want to use decorators, but still need to support Python 2.3?  Wish you could
 have class decorators, or decorate arbitrary assignments?  Then you need
 "DecoratorTools".  Some quick examples::
@@ -110,6 +113,119 @@ decorate_class(decorator [, depth=2, frame=None])
     be calling ``decorate_class()``.  Alternately, you can specify the `depth`
     that ``decorate_class()`` should call ``sys._getframe()`` with, but this
     can be a bit trickier to compute correctly.
+
+
+The ``struct()`` Decorator
+--------------------------
+
+The ``struct()`` decorator creates a tuple subclass with the same name and
+docstring as the decorated function.  The class will have read-only properties
+with the same names as the function's arguments, and the ``repr()`` of its
+instances will look like a call to the original function::
+
+    >>> from peak.util.decorators import struct
+
+    >>> def X(a,b,c):
+    ...     """Demo type"""
+    ...     return a,b,c
+
+    >>> X = struct()(X)    # can't use decorators above functions in doctests
+
+    >>> v = X(1,2,3)
+    >>> v
+    X(1, 2, 3)
+    >>> v.a
+    1
+    >>> v.b
+    2
+    >>> v.c
+    3
+
+    >>> help(X)
+    Help on class X:
+    <BLANKLINE>
+    class X(__builtin__.tuple)
+     |  Demo type
+     |
+     |  Method resolution order:
+     |      X
+     |      __builtin__.tuple
+     |      __builtin__.object
+     |
+     |  Methods defined here:
+     |
+     |  __repr__(self)
+     |
+     |  ----------------------------------------------------------------------
+     |  Static methods defined here:
+     |
+     |  __new__(cls, *args, **kw)
+     |
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |
+     |  a
+     |
+     |  b
+     |
+     |  c
+     |
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |
+     |  __args__ = ['a', 'b', 'c']
+     |
+     |  __star__ = None
+     |
+     |  ...
+
+The function should return a tuple of values in the same order as its argument
+names, as it will be used by the class' constructor. The function can perform
+validation, add defaults, and/or do type conversions on the values.
+
+If the function takes a ``*``, argument, it should flatten this argument
+into the result tuple, e.g.::
+
+    >>> def pair(first, *rest):
+    ...     return (first,) + rest
+    >>> pair = struct()(pair)
+
+    >>> p = pair(1,2,3,4)
+    >>> p
+    pair(1, 2, 3, 4)
+    >>> p.first
+    1
+    >>> p.rest
+    (2, 3, 4)
+
+The ``struct()`` decorator takes optional mixin classes (as positional
+arguments), and dictionary entries (as keyword arguments).  The mixin
+classes will be placed before ``tuple`` in the resulting class' bases, and
+the dictionary entries will be placed in the class' dictionary.  These
+entries take precedence over any default entries (e.g. methods, properties,
+docstring, etc.) that are created by the ``struct()`` decorator::
+
+    >>> class Mixin(object):
+    ...     __slots__ = []
+    ...     def foo(self): print "bar"
+
+    >>> def demo(a, b):
+    ...     return a, b
+
+    >>> demo = struct(Mixin, reversed=property(lambda self: self[::-1]))(demo)
+    >>> demo(1,2).foo()
+    bar
+    >>> demo(3,4).reversed
+    (4, 3)
+    >>> demo.__mro__
+    (<class 'demo'>, <class ...Mixin...>, <type 'tuple'>, <type 'object'>)
+
+Note that using mixin classes will result in your new class' instances having
+a ``__dict__`` attribute, unless they are new-style classes that set
+``__slots__`` to an empty list.  And if they have any slots other than
+``__weakref__`` or ``__dict__``, this will cause a type error due to layout
+conflicts.  In general, it's best to use mixins only for adding methods, not
+data.
 
 
 Advanced Decorators

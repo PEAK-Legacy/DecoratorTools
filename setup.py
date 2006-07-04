@@ -7,7 +7,7 @@ from setuptools import setup
 
 # Metadata
 PACKAGE_NAME = "DecoratorTools"
-PACKAGE_VERSION = "1.0"
+PACKAGE_VERSION = "1.1"
 PACKAGES = ['peak', 'peak.util']
 
 def get_description():

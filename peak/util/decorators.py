@@ -2,7 +2,7 @@ from types import ClassType, FunctionType
 import sys
 __all__ = [
     'decorate_class', 'metaclass_is_decorator', 'metaclass_for_bases',
-    'frameinfo', 'decorate_assignment', 'decorate',
+    'frameinfo', 'decorate_assignment', 'decorate', 'struct'
 ]
 
 
@@ -33,6 +33,88 @@ def decorate(*decorators):
         return v
 
     return decorate_assignment(callback)
+
+
+
+
+
+
+def struct(*mixins, **kw):
+    """Turn a function into a simple data structure class
+
+    This decorator creates a tuple subclass with the same name and docstring as
+    the decorated function.  The class will have read-only properties with the
+    same names as the function's arguments, and the ``repr()`` of its instances
+    will look like a call to the original function.  The function should return
+    a tuple of values in the same order as its argument names, as it will be
+    used by the class' constructor.  The function can perform validation, add
+    defaults, and/or do type conversions on the values.
+
+    If the function takes a ``*``, argument, it should flatten this argument
+    into the result tuple, e.g.::
+
+        @struct()
+        def pair(first, *rest):
+            return (first,) + rest
+
+    The ``rest`` property of the resulting class will thus return a tuple for
+    the ``*rest`` arguments, and the structure's ``repr()`` will reflect the
+    way it was created.
+
+    The ``struct()`` decorator takes optional mixin classes (as positional
+    arguments), and dictionary entries (as keyword arguments).  The mixin
+    classes will be placed before ``tuple`` in the resulting class' bases, and
+    the dictionary entries will be placed in the class' dictionary.  These
+    entries take precedence over any default entries (e.g. methods, properties,
+    docstring, etc.) that are created by the ``struct()`` decorator.
+    """
+
+    def callback(frame, name, func, old_locals):
+
+        def __new__(cls, *args, **kw):
+            result = func(*args, **kw)
+            return tuple.__new__(cls, result)
+
+        def __repr__(self):
+            return name+tuple.__repr__(self)
+
+
+
+        import inspect
+        args, star, dstar, defaults = inspect.getargspec(func)
+
+        d = dict(
+            __new__ = __new__, __repr__ = __repr__, __doc__=func.__doc__,
+            __module__ = func.__module__, __args__ = args, __star__ = star,
+            __slots__ = [],
+        )
+
+        for p,a in enumerate(args):
+            if isinstance(a,str):
+                d[a] = property(lambda self, p=p: self[p])
+
+        if star:
+            d[star] = property(lambda self, p=len(args): self[p:])
+
+        d.update(kw)
+        return type(name, mixins+(tuple,), d)
+
+    return decorate_assignment(callback)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
