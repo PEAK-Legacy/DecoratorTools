@@ -73,12 +73,12 @@ def struct(*mixins, **kw):
         def __new__(cls, *args, **kw):
             result = func(*args, **kw)
             if type(result) is tuple:
-                return tuple.__new__(cls, result)
+                return tuple.__new__(cls, (cls,)+result)
             else:
                 return result
 
         def __repr__(self):
-            return name+tuple.__repr__(self)
+            return name+tuple.__repr__(self[1:])
 
         import inspect
         args, star, dstar, defaults = inspect.getargspec(func)
@@ -91,10 +91,10 @@ def struct(*mixins, **kw):
 
         for p,a in enumerate(args):
             if isinstance(a,str):
-                d[a] = property(lambda self, p=p: self[p])
+                d[a] = property(lambda self, p=p+1: self[p])
 
         if star:
-            d[star] = property(lambda self, p=len(args): self[p:])
+            d[star] = property(lambda self, p=len(args)+1: self[p:])
 
         d.update(kw)
         return type(name, mixins+(tuple,), d)

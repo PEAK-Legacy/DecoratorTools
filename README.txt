@@ -2,7 +2,8 @@ Class, Function, and Assignment Decorators for Python 2.3+
 ==========================================================
 
 (NEW in 1.1: The ``struct()`` decorator makes it easy to create tuple-like data
-structure types, by decorating a constructor function.)
+structure types, by decorating a constructor function.  Version 1.2 fixes a
+problem where instances of different struct types could equal each other.)
 
 Want to use decorators, but still need to support Python 2.3?  Wish you could
 have class decorators, or decorate arbitrary assignments?  Then you need
@@ -198,6 +199,36 @@ into the result tuple, e.g.::
     >>> p.rest
     (2, 3, 4)
 
+Internally, ``struct`` types are actually tuples::
+
+    >>> print tuple.__repr__(X(1,2,3))
+    (<class 'X'>, 1, 2, 3)
+
+The internal representation contains the struct's type object, so that structs
+of different types will not compare equal to each other::
+
+    >>> def Y(a,b,c):
+    ...     return a,b,c
+    >>> Y = struct()(Y)
+
+    >>> X(1,2,3) == X(1,2,3)
+    True
+    >>> Y(1,2,3) == Y(1,2,3)
+    True
+    >>> X(1,2,3) == Y(1,2,3)
+    False
+
+Note, however, that this means that if you want to unpack them or otherwise
+access members directly, you must include the type entry, or use a slice::
+
+    >>> a, b, c = X(1,2,3)  # wrong
+    Traceback (most recent call last):
+      ...
+    ValueError: too many values to unpack
+
+    >>> t, a, b, c = X(1,2,3)       # right
+    >>> a, b, c    = X(1,2,3)[1:]   # ok, if perhaps a bit unintuitive
+
 The ``struct()`` decorator takes optional mixin classes (as positional
 arguments), and dictionary entries (as keyword arguments).  The mixin
 classes will be placed before ``tuple`` in the resulting class' bases, and
@@ -212,7 +243,7 @@ docstring, etc.) that are created by the ``struct()`` decorator::
     >>> def demo(a, b):
     ...     return a, b
 
-    >>> demo = struct(Mixin, reversed=property(lambda self: self[::-1]))(demo)
+    >>> demo = struct(Mixin, reversed=property(lambda self: self[:0:-1]))(demo)
     >>> demo(1,2).foo()
     bar
     >>> demo(3,4).reversed
