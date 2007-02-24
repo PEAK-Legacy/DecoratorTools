@@ -33,7 +33,7 @@ setup(
     author="Phillip J. Eby",
     author_email="peak@eby-sarna.com",
     license="PSF or ZPL",
-    url="http://peak.telecommunity.com/DevCenter/DecoratorTools",
+    url="http://cheeseshop.python.org/pypi/DecoratorTools",
     test_suite = 'test_decorators',
     packages = PACKAGES,
     namespace_packages = PACKAGES,

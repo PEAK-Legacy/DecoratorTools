@@ -2,7 +2,8 @@ Class, Function, and Assignment Decorators for Python 2.3+
 ==========================================================
 
 Want to use decorators, but still need to support Python 2.3?  Wish you could
-have class decorators, or decorate arbitrary assignments?  Then you need
+have class decorators, decorate arbitrary assignments, or match decorated
+function signatures to their original functions?  Then you need
 "DecoratorTools".  Some quick examples::
 
     # Method decorator example
@@ -39,7 +40,15 @@ This standalone version is backward-compatible with the bundled versions, so you
 can mix and match decorators from this package with those provided by
 zope.interface, TurboGears, etc.
 
+For complete documentation, see the `DecoratorTools manual`_.
+
 Changes since version 1.2:
+
+  * Added ``rewrap()`` function and ``template_function`` decorator to support
+    signature matching for decorated functions.  (These features are similar to
+    the ones provided by Michele Simionato's "decorator" package, but do not
+    require Python 2.4 and don't change the standard idioms for creating
+    decorator functions.)
 
   * ``decorate_class()`` will no longer apply duplicate class decorator
     callbacks unless the ``allow_duplicates`` argument is true.
@@ -54,6 +63,9 @@ Changes since version 1.0:
   * The ``struct()`` decorator makes it easy to create tuple-like data
     structure types, by decorating a constructor function.
 
+.. _DecoratorTools Manual: http://peak.telecommunity.com/DevCenter/DecoratorTools#toc
+
+.. _toc:
 
 .. contents:: **Table of Contents**
 
@@ -309,6 +321,126 @@ returned from the class' constructor.  This is sometimes useful::
     >>> And(None, 27)
     27
 
+
+Signature Matching
+------------------
+
+One of the drawbacks to using function decorators is that using ``help()`` or
+other documentation tools on a decorated function usually produces unhelpful
+results::
+
+    >>> def before_and_after(message):
+    ...     def decorator(func):
+    ...         def decorated(*args, **kw):
+    ...             print "before", message
+    ...             try:
+    ...                 return func(*args, **kw)
+    ...             finally:
+    ...                 print "after", message
+    ...         return decorated
+    ...     return decorator
+
+    >>> def foo(bar, baz):
+    ...     """Here's some doc"""
+
+    >>> foo(1,2)
+    >>> help(foo)               # doctest: -NORMALIZE_WHITESPACE
+    Help on function foo:
+    ...
+    foo(bar, baz)
+        Here's some doc
+    ...
+
+    >>> decorated_foo = before_and_after("hello")(foo)
+    >>> decorated_foo(1,2)
+    before hello
+    after hello
+
+    >>> help(decorated_foo)     # doctest: -NORMALIZE_WHITESPACE
+    Help on function decorated:
+    ...
+    decorated(*args, **kw)
+    ...
+
+So DecoratorTools provides you with two tools to improve this situation.
+First, the ``rewrap()`` function provides a simple way to match the signature,
+module, and other characteristics of the original function::
+
+    >>> from peak.util.decorators import rewrap
+
+    >>> def before_and_after(message):
+    ...     def decorator(func):
+    ...         def decorated(*args, **kw):
+    ...             print "before", message
+    ...             try:
+    ...                 return func(*args, **kw)
+    ...             finally:
+    ...                 print "after", message
+    ...         return rewrap(func, decorated)
+    ...     return decorator
+
+    >>> decorated_foo = before_and_after("hello")(foo)
+    >>> decorated_foo(1,2)
+    before hello
+    after hello
+
+    >>> help(decorated_foo)     # doctest: -NORMALIZE_WHITESPACE
+    Help on function foo:
+    ...
+    foo(bar, baz)
+        Here's some doc
+    ...
+
+The ``rewrap()`` function returns you a new function object with the same
+attributes (including ``__doc__``, ``__dict__``, ``__name__``, ``__module__``,
+etc.) as the original function, but which calls the decorated function.
+
+If you want the same signature but don't want the overhead of another calling
+level at runtime, you can use the ``@template_function`` decorator instead.
+The downside to this approach, however, is that it is more complex to use and
+makes debugging the wrapper function more difficult (because its source can't
+be seen in a Python debugger).  So, this approach is only recommended for
+the most performance-intensive of decorators.  If you need to use it, it looks
+something like this::
+
+    >>> from peak.util.decorators import template_function
+
+    >>> def before_and_after(message):
+    ...     def decorator(func):
+    ...         [template_function()]   # could also be @template_function in 2.4
+    ...         def decorate(__func, __message):
+    ...             '''
+    ...             print "before", __message
+    ...             try:
+    ...                 return __func($args)
+    ...             finally:
+    ...                 print "after", __message
+    ...             '''
+    ...         return decorate(func, message)
+    ...     return decorator
+
+    >>> decorated_foo = before_and_after("hello")(foo)
+    >>> decorated_foo(1,2)
+    before hello
+    after hello
+
+    >>> help(decorated_foo)     # doctest: -NORMALIZE_WHITESPACE
+    Help on function foo:
+    ...
+    foo(bar, baz)
+        Here's some doc
+    ...
+
+As you can see, the process is somewhat more complex.  Any values you wish
+the generated function to be able to access (aside from builtins) must be
+declared as arguments to the decorating function, and all arguments must be
+named so as not to conflict with the names of any of the decorated function's
+arguments.  The docstring must either fit on one line, or begin with a newline
+and have its contents indented by at least two spaces.  The string ``$args``
+may be used one or more times in the docstring, whenver calling the original
+function.  The first argument of the decorating function must always be the
+original function.
+    
 
 Advanced Decorators
 -------------------

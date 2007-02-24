@@ -2,7 +2,8 @@ from types import ClassType, FunctionType
 import sys
 __all__ = [
     'decorate_class', 'metaclass_is_decorator', 'metaclass_for_bases',
-    'frameinfo', 'decorate_assignment', 'decorate', 'struct'
+    'frameinfo', 'decorate_assignment', 'decorate', 'struct',
+    'template_function', 'rewrap',
 ]
 
 
@@ -37,6 +38,128 @@ def decorate(*decorators):
 
 
 
+
+def name_and_spec(func):
+    from inspect import formatargspec, getargspec
+    funcname = func.__name__
+    if funcname=='<lambda>':
+        funcname = "anonymous"
+    args, varargs, kwargs, defaults = getargspec(func)
+    return funcname, formatargspec(args, varargs, kwargs)[1:-1]
+
+
+def apply_template(wrapper, func, *args, **kw):
+    funcname, argspec  = name_and_spec(func)
+    wrapname, wrapspec = name_and_spec(wrapper)   
+    body = wrapper.__doc__.replace('%','%%').replace('$args','%(argspec)s')
+    d ={}
+    body = """
+def %(wrapname)s(%(wrapspec)s):
+ def %(funcname)s(%(argspec)s): """+body+"""
+ return %(funcname)s
+"""
+    exec body % locals() in globals(), d
+    
+    impl = d[wrapname](func, *args, **kw)
+    from new import function
+    f = function(
+        impl.func_code, func.func_globals, func.__name__,
+        impl.func_defaults, impl.func_closure
+    )
+    f.__doc__  = func.__doc__
+    f.__dict__ = func.__dict__
+    return f
+
+
+def _rewrap(__original, __wrapper):
+    """return __wrapper($args)"""
+
+
+
+
+
+
+
+def rewrap(func, wrapper):
+    """Create a wrapper with the signature of `func` and a body of `wrapper`
+
+    Example::
+
+        def before_and_after(func):
+            def decorated(*args, **kw):
+                print "before"
+                try:
+                    return func(*args, **kw)
+                finally:
+                    print "after"
+            return rewrap(func, decorated)
+
+    The above function is a normal decorator, but when users run ``help()``
+    or other documentation tools on the returned wrapper function, they will
+    see a function with the original function's name, signature, module name,
+    etc.
+
+    This function is similar in use to the ``@template_function`` decorator,
+    but rather than generating the entire decorator function in one calling
+    layer, it simply generates an extra layer for signature compatibility.
+
+    NOTE: the function returned from ``rewrap()`` will have the same attribute
+    ``__dict__`` as the original function, so if you need to set any function
+    attributes you should do so on the function returned from ``rewrap()``
+    (or on the original function), and *not* on the wrapper you're passing in
+    to ``rewrap()``.
+    """
+    return apply_template(_rewrap, func, wrapper)
+
+
+
+
+
+
+
+
+
+
+
+def template_function(wrapper=None):
+    """Decorator that uses its wrapped function's docstring as a template
+
+    Example::
+
+        def before_and_after(func):
+            @template_function
+            def wrap(__func, __message):
+                '''
+                print "before", __message
+                try:
+                    return __func($args)
+                finally:
+                    print "after", __message
+                '''
+            return wrap(func, "test")
+
+    The above code will return individually-generated wrapper functions whose
+    signature, defaults, ``__name__``, ``__module__``, and ``func_globals``
+    match those of the wrapped functions.
+
+    You can use define any arguments you wish in the wrapping function, as long
+    as the first argument is the function to be wrapped, and the arguments are
+    named so as not to conflict with the arguments of the function being
+    wrapped.  (i.e., they should have relatively unique names.)
+
+    Note that the function body will *not* have access to any globals in the
+    calling module!  Any global (i.e., non-argument) names used in the body
+    will be looked up in the *wrapped* function's globals, not the wrapper's
+    globals.  So, any non-builtin values that you need in the wrapper should
+    be passed in as arguments to the template function.
+
+    Also note that the resulting function will not be source-debuggable, as it
+    is created using exec.  You should therefore minimize the amount of code
+    in the template body as much as possible.
+    """
+    if wrapper is None:
+        return decorate_assignment(lambda f,k,v,o: template_function(v))       
+    return apply_template.__get__(wrapper)
 
 
 def struct(*mixins, **kw):
