@@ -1,10 +1,6 @@
 Class, Function, and Assignment Decorators for Python 2.3+
 ==========================================================
 
-(NEW in 1.1: The ``struct()`` decorator makes it easy to create tuple-like data
-structure types, by decorating a constructor function.  Version 1.2 fixes a
-problem where instances of different struct types could equal each other.)
-
 Want to use decorators, but still need to support Python 2.3?  Wish you could
 have class decorators, or decorate arbitrary assignments?  Then you need
 "DecoratorTools".  Some quick examples::
@@ -42,6 +38,21 @@ widely used and tested.  (Unit tests are also included, of course.)
 This standalone version is backward-compatible with the bundled versions, so you
 can mix and match decorators from this package with those provided by
 zope.interface, TurboGears, etc.
+
+Changes since version 1.2:
+
+  * ``decorate_class()`` will no longer apply duplicate class decorator
+    callbacks unless the ``allow_duplicates`` argument is true.
+
+Changes since version 1.1:
+
+  * Fixed a problem where instances of different struct types could equal each
+    other
+
+Changes since version 1.0:
+
+  * The ``struct()`` decorator makes it easy to create tuple-like data
+    structure types, by decorating a constructor function.
 
 
 .. contents:: **Table of Contents**
@@ -87,16 +98,17 @@ decorate_class(decorator [, depth=2, frame=None])
     of the original class, so the decorator should return the input class if it
     does not wish to replace it.  Example::
 
-        from peak.util.decorators import decorate_class
+        >>> from peak.util.decorators import decorate_class
 
-        def demo_class_decorator():
-            def decorator(cls):
-                print "decorating", cls
-                return cls
-            decorate_class(decorator)
+        >>> def demo_class_decorator():
+        ...     def decorator(cls):
+        ...         print "decorating", cls
+        ...         return cls
+        ...     decorate_class(decorator)
 
-        class Demo:
-            demo_class_decorator()  # this will print "decorating <class Demo>"
+        >>> class Demo:
+        ...     demo_class_decorator()
+        decorating __builtin__.Demo
 
     In the above example, ``demo_class_decorator()`` is the decorator factory
     function, and its inner function ``decorator`` is what gets called to
@@ -115,6 +127,31 @@ decorate_class(decorator [, depth=2, frame=None])
     that ``decorate_class()`` should call ``sys._getframe()`` with, but this
     can be a bit trickier to compute correctly.
 
+    Note, by the way that ``decorate_class()`` ignores duplicate callbacks::
+
+        >>> def hello(cls):
+        ...     print "decorating", cls
+        ...     return cls
+
+        >>> def do_hello():
+        ...     decorate_class(hello)
+
+        >>> class Demo:
+        ...     do_hello()
+        ...     do_hello()
+        decorating __builtin__.Demo
+
+    Unless the ``allow_duplicates`` argument is set to a true value::
+
+        >>> def do_hello():
+        ...     decorate_class(hello, allow_duplicates=True)
+
+        >>> class Demo:
+        ...     do_hello()
+        ...     do_hello()
+        decorating __builtin__.Demo
+        decorating __builtin__.Demo
+    
 
 The ``struct()`` Decorator
 --------------------------
@@ -142,7 +179,7 @@ instances will look like a call to the original function::
     >>> v.c
     3
 
-    >>> help(X)
+    >>> help(X) # doctest: +NORMALIZE_WHITESPACE
     Help on class X:
     <BLANKLINE>
     class X(__builtin__.tuple)
@@ -163,18 +200,18 @@ instances will look like a call to the original function::
      |  __new__(cls, *args, **kw)
      |
      |  ----------------------------------------------------------------------
-     |  Data descriptors defined here:
+     |  ...s defined here:
      |
-     |  a
+     |  a...
      |
-     |  b
+     |  b...
      |
-     |  c
+     |  c...
      |
      |  ----------------------------------------------------------------------
      |  Data and other attributes defined here:
      |
-     |  __args__ = ['a', 'b', 'c']
+     |  __args__ = ['a', 'b', 'c']...
      |
      |  __star__ = None
      |

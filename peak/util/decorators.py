@@ -162,7 +162,7 @@ def frameinfo(frame):
 
 
 
-def decorate_class(decorator, depth=2, frame=None):
+def decorate_class(decorator, depth=2, frame=None, allow_duplicates=False):
 
     """Set up `decorator` to be passed the containing class upon creation
 
@@ -196,11 +196,11 @@ def decorate_class(decorator, depth=2, frame=None):
         raise SyntaxError(
             "Class decorators may only be used inside a class statement"
         )
+    elif not allow_duplicates and has_class_decorator(decorator, None, frame):
+        return
 
     previousMetaclass = caller_locals.get('__metaclass__')
     defaultMetaclass  = caller_globals.get('__metaclass__', ClassType)
-
-
 
 
     def advise(name,bases,cdict):
@@ -242,6 +242,47 @@ def decorate_class(decorator, depth=2, frame=None):
 def metaclass_is_decorator(ob):
     """True if 'ob' is a class advisor function"""
     return isinstance(ob,FunctionType) and hasattr(ob,'previousMetaclass')
+
+
+def iter_class_decorators(depth=2, frame=None):
+    frame = frame or sys._getframe(depth)
+    m = frame.f_locals.get('__metaclass__')
+    while metaclass_is_decorator(m):
+        yield getattr(m, 'callback', None)
+        m = m.previousMetaclass
+
+def has_class_decorator(decorator, depth=2, frame=None):
+    return decorator in iter_class_decorators(0, frame or sys._getframe(depth))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def metaclass_for_bases(bases, explicit_mc=None):
