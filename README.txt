@@ -515,7 +515,7 @@ use the ``cache_source()`` function::
 
     >>> cache_source("<dummy filename 1>", demo_source)
     >>> getline("<dummy filename 1>", 3)
-    'line 3\n'
+    'line 3'
 
 The function requires a dummy filename, which must be globally unique.  An easy
 way to ensure uniqueness is to include the ``id()`` of an object that will

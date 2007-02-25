@@ -158,7 +158,7 @@ def _cache_lines(filename, lines, owner=None):
     linecache.cache[filename] = 0, None, lines, owner
 
 def cache_source(filename, source, owner=None):
-    _cache_lines(filename, [line+'\n' for line in source.splitlines()], owner)
+    _cache_lines(filename, source.splitlines(True), owner)
 
 
 
