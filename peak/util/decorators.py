@@ -1,9 +1,10 @@
 from types import ClassType, FunctionType
-import sys
+import sys, os
+
 __all__ = [
     'decorate_class', 'metaclass_is_decorator', 'metaclass_for_bases',
     'frameinfo', 'decorate_assignment', 'decorate', 'struct',
-    'template_function', 'rewrap',
+    'template_function', 'rewrap', 'cache_source',
 ]
 
 
@@ -38,7 +39,6 @@ def decorate(*decorators):
 
 
 
-
 def name_and_spec(func):
     from inspect import formatargspec, getargspec
     funcname = func.__name__
@@ -46,6 +46,11 @@ def name_and_spec(func):
         funcname = "anonymous"
     args, varargs, kwargs, defaults = getargspec(func)
     return funcname, formatargspec(args, varargs, kwargs)[1:-1]
+
+
+def qname(func):
+    m = func.__module__
+    return m and m+'.'+func.__name__ or func.__name__
 
 
 def apply_template(wrapper, func, *args, **kw):
@@ -58,22 +63,17 @@ def %(wrapname)s(%(wrapspec)s):
  def %(funcname)s(%(argspec)s): """+body+"""
  return %(funcname)s
 """
-    exec body % locals() in globals(), d
+    body %= locals()
+    filename = "<%s wrapping %s at 0x%08X>" % (qname(wrapper), qname(func), id(func))
+    exec compile(body, filename, "exec") in func.func_globals, d
     
-    impl = d[wrapname](func, *args, **kw)
-    from new import function
-    f = function(
-        impl.func_code, func.func_globals, func.__name__,
-        impl.func_defaults, impl.func_closure
-    )
+    f = d[wrapname](func, *args, **kw)
+    cache_source(filename, body, f)
+
+    f.func_defaults = func.func_defaults
     f.__doc__  = func.__doc__
     f.__dict__ = func.__dict__
     return f
-
-
-def _rewrap(__original, __wrapper):
-    """return __wrapper($args)"""
-
 
 
 
@@ -109,7 +109,9 @@ def rewrap(func, wrapper):
     (or on the original function), and *not* on the wrapper you're passing in
     to ``rewrap()``.
     """
-    return apply_template(_rewrap, func, wrapper)
+    def rewrap(__original, __decorated):
+        """return __decorated($args)"""
+    return apply_template(rewrap, func, wrapper)
 
 
 
@@ -118,6 +120,45 @@ def rewrap(func, wrapper):
 
 
 
+
+if sys.version<"2.5":
+    # We'll need this for monkeypatching linecache
+    def checkcache(filename=None):
+        """Discard cache entries that are out of date.
+        (This is not checked upon each call!)"""       
+        if filename is None:
+            filenames = linecache.cache.keys()
+        else:
+            if filename in linecache.cache:
+                filenames = [filename]
+            else:
+                return       
+        for filename in filenames:
+            size, mtime, lines, fullname = linecache.cache[filename]
+            if mtime is None:
+                continue   # no-op for files loaded via a __loader__
+            try:
+                stat = os.stat(fullname)
+            except os.error:
+                del linecache.cache[filename]
+                continue
+            if size != stat.st_size or mtime != stat.st_mtime:
+                del linecache.cache[filename]
+        
+    
+def _cache_lines(filename, lines, owner=None):
+    if owner is None:
+        owner = filename
+    else:
+        from weakref import ref
+        owner = ref(owner, lambda r: linecache and linecache.cache.__delitem__(filename))
+    global linecache; import linecache
+    if sys.version<"2.5" and linecache.checkcache.__module__!=__name__:
+        linecache.checkcache = checkcache
+    linecache.cache[filename] = 0, None, lines, owner
+
+def cache_source(filename, source, owner=None):
+    _cache_lines(filename, [line+'\n' for line in source.splitlines()], owner)
 
 
 
@@ -147,19 +188,19 @@ def template_function(wrapper=None):
     named so as not to conflict with the arguments of the function being
     wrapped.  (i.e., they should have relatively unique names.)
 
-    Note that the function body will *not* have access to any globals in the
-    calling module!  Any global (i.e., non-argument) names used in the body
-    will be looked up in the *wrapped* function's globals, not the wrapper's
-    globals.  So, any non-builtin values that you need in the wrapper should
+    Note that the function body will *not* have access to the globals of the
+    calling module, as it is compiled with the globals of the *wrapped*
+    function!  Thus, any non-builtin values that you need in the wrapper should
     be passed in as arguments to the template function.
-
-    Also note that the resulting function will not be source-debuggable, as it
-    is created using exec.  You should therefore minimize the amount of code
-    in the template body as much as possible.
     """
     if wrapper is None:
         return decorate_assignment(lambda f,k,v,o: template_function(v))       
     return apply_template.__get__(wrapper)
+
+
+
+
+
 
 
 def struct(*mixins, **kw):

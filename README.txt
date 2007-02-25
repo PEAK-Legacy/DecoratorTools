@@ -42,6 +42,11 @@ zope.interface, TurboGears, etc.
 
 For complete documentation, see the `DecoratorTools manual`_.
 
+Changes since version 1.3:
+
+  * Added support for debugging generated code, including the code generated
+    by ``rewrap()`` and ``template_function``.
+
 Changes since version 1.2:
 
   * Added ``rewrap()`` function and ``template_function`` decorator to support
@@ -370,13 +375,13 @@ module, and other characteristics of the original function::
 
     >>> def before_and_after(message):
     ...     def decorator(func):
-    ...         def decorated(*args, **kw):
+    ...         def before_and_after(*args, **kw):
     ...             print "before", message
     ...             try:
     ...                 return func(*args, **kw)
     ...             finally:
     ...                 print "after", message
-    ...         return rewrap(func, decorated)
+    ...         return rewrap(func, before_and_after)
     ...     return decorator
 
     >>> decorated_foo = before_and_after("hello")(foo)
@@ -397,18 +402,17 @@ etc.) as the original function, but which calls the decorated function.
 
 If you want the same signature but don't want the overhead of another calling
 level at runtime, you can use the ``@template_function`` decorator instead.
-The downside to this approach, however, is that it is more complex to use and
-makes debugging the wrapper function more difficult (because its source can't
-be seen in a Python debugger).  So, this approach is only recommended for
-the most performance-intensive of decorators.  If you need to use it, it looks
-something like this::
+The downside to this approach, however, is that it is more complex to use.  So,
+this approach is only recommended for more performance-intensive decorators,
+that you've already debugged using the ``rewrap()`` approach.  But if you need
+to use it, the appropriate usage looks something like this::
 
     >>> from peak.util.decorators import template_function
 
-    >>> def before_and_after(message):
+    >>> def before_and_after2(message):
     ...     def decorator(func):
     ...         [template_function()]   # could also be @template_function in 2.4
-    ...         def decorate(__func, __message):
+    ...         def before_and_after2(__func, __message):
     ...             '''
     ...             print "before", __message
     ...             try:
@@ -416,10 +420,10 @@ something like this::
     ...             finally:
     ...                 print "after", __message
     ...             '''
-    ...         return decorate(func, message)
+    ...         return before_and_after2(func, message)
     ...     return decorator
 
-    >>> decorated_foo = before_and_after("hello")(foo)
+    >>> decorated_foo = before_and_after2("hello")(foo)
     >>> decorated_foo(1,2)
     before hello
     after hello
@@ -437,10 +441,103 @@ declared as arguments to the decorating function, and all arguments must be
 named so as not to conflict with the names of any of the decorated function's
 arguments.  The docstring must either fit on one line, or begin with a newline
 and have its contents indented by at least two spaces.  The string ``$args``
-may be used one or more times in the docstring, whenver calling the original
+may be used one or more times in the docstring, whenever calling the original
 function.  The first argument of the decorating function must always be the
 original function.
-    
+
+
+Debugging Generated Code
+------------------------
+
+Both ``rewrap()`` and ``template_function`` are implemented using code
+generation and runtime compile/exec operations.  Normally, such things are
+frowned on in Python because Python's debugging tools don't work on generated
+code.  In particular, tracebacks and pdb don't show the source code of
+functions compiled from strings...   or do they?  Let's see::
+
+    >>> def raiser(x, y="blah"):
+    ...     raise TypeError(y)
+
+    >>> def call_and_print_error(func, *args, **kw):
+    ...     # This function is necessary because we want to test the error
+    ...     # output, but doctest ignores a lot of exception detail, and
+    ...     # won't show the non-errror output unless we do it this way
+    ...     #
+    ...     try:
+    ...         func(*args, **kw)
+    ...     except:
+    ...         import sys, traceback
+    ...         print ''.join(traceback.format_exception(*sys.exc_info()))
+
+    >>> call_and_print_error(before_and_after("error")(raiser), 99)
+    before error
+    after error
+    Traceback (most recent call last):
+      File "<doctest README.txt[...]>", line ..., in call_and_print_error
+        func(*args, **kw)
+      File "<peak.util.decorators.rewrap wrapping raiser at 0x...>", line 3, in raiser
+        def raiser(x, y): return __decorated(x, y)
+      File ..., line ..., in before_and_after
+        return func(*args, **kw)
+      File "<doctest README.txt[...]>", line 2, in raiser
+        raise TypeError(y)
+    TypeError: blah
+
+    >>> call_and_print_error(before_and_after2("error")(raiser), 99)
+    before error
+    after error
+    Traceback (most recent call last):
+      File "<doctest README.txt[...]>", line ..., in call_and_print_error
+        func(*args, **kw)
+      File "<before_and_after2 wrapping raiser at 0x...>", line 6, in raiser
+        return __func(x, y)
+      File "<doctest README.txt[...]>", line 2, in raiser
+        raise TypeError(y)
+    TypeError: blah
+
+As you can see, both decorators' tracebacks include lines from the pseudo-files
+"<peak.util.decorators.rewrap wrapping raiser at 0x...>" and "<before_and_after2
+wrapping raiser at 0x...>" (the hex id's of the corresponding objects are
+omitted here).  This is because DecoratorTools adds information to the Python
+``linecache`` module, and tracebacks and pdb both use the ``linecache`` module
+to get source lines.  Any tools that use ``linecache``, either directly or
+indirectly, will therefore be able to display this information for generated
+code.
+
+If you'd like to be able to use this feature for your own code generation or
+non-file-based code (e.g. Python source loaded from a database, etc.), you can
+use the ``cache_source()`` function::
+
+    >>> from peak.util.decorators import cache_source
+    >>> from linecache import getline
+
+    >>> demo_source = "line 1\nline 2\nline 3"
+
+    >>> cache_source("<dummy filename 1>", demo_source)
+    >>> getline("<dummy filename 1>", 3)
+    'line 3\n'
+
+The function requires a dummy filename, which must be globally unique.  An easy
+way to ensure uniqueness is to include the ``id()`` of an object that will
+exist at least as long as the source code being cached.
+
+Also, if you have such an object, and it is weak-referenceable, you can supply
+it as a third argument to ``cache_source()``, and when that object is garbage
+collected the source will be removed from the ``linecache`` cache.  If you're
+generating a function from the source, the function object itself is ideal for
+this purpose (and it's what ``rewrap()`` and ``template_function`` do)::
+
+    >>> def a_function(): pass  # just an object to "own" the source
+
+    >>> cache_source("<dummy filename 2>", demo_source, a_function)
+    >>> getline("<dummy filename 2>", 1)
+    'line 1\n'
+
+    >>> del a_function  # GC should now clean up the cache
+
+    >>> getline("<dummy filename 2>", 1)
+    ''  
+
 
 Advanced Decorators
 -------------------
