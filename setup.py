@@ -27,9 +27,9 @@ def get_description():
 setup(
     name=PACKAGE_NAME,
     version=PACKAGE_VERSION,
-    description="Use class and function decorators -- even in Python 2.3!",
+    description="Use class and function decorators -- even in Python 2.3"
+                " (now with source debugging for generated code)!",
     long_description = get_description(),
-
     author="Phillip J. Eby",
     author_email="peak@eby-sarna.com",
     license="PSF or ZPL",
