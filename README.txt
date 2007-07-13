@@ -42,6 +42,12 @@ zope.interface, TurboGears, etc.
 
 For complete documentation, see the `DecoratorTools manual`_.
 
+Changes since version 1.4:
+
+  * Added ``enclosing_frame()`` function, so that complex decorators that call
+    DecoratorTools functions while being called *by* DecoratorTools functions,
+    will work correctly.
+
 Changes since version 1.3:
 
   * Added support for debugging generated code, including the code generated
@@ -625,6 +631,15 @@ metaclass_for_bases(bases, explicit_mc=None)
     ``__metaclass__`` into account, only the arguments as given.  If there
     are no base classes, you should just directly use the module-level
     ``__metaclass__`` or ``types.ClassType`` if there is none.
+
+enclosing_frame(frame=None, level=3)
+    Given a frame and/or stack level, skip upward past any DecoratorTools code
+    frames.  This function is used by ``decorate_class()`` and
+    ``decorate_assignment()`` to ensure that any decorators calling them that
+    were themselves invoked using ``decorate()``, won't end up looking at
+    DecoratorTools code instead of the target.  If you have a function that
+    needs to be callable via ``decorate()`` and which inspects stack frames,
+    you may need to use this function to access the right frame.
 
 
 Mailing List

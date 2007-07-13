@@ -4,9 +4,8 @@ import sys, os
 __all__ = [
     'decorate_class', 'metaclass_is_decorator', 'metaclass_for_bases',
     'frameinfo', 'decorate_assignment', 'decorate', 'struct',
-    'template_function', 'rewrap', 'cache_source',
+    'template_function', 'rewrap', 'cache_source', 'enclosing_frame',
 ]
-
 
 def decorate(*decorators):
     """Use Python 2.4 decorators w/Python 2.3+
@@ -24,7 +23,6 @@ def decorate(*decorators):
     This function can be used to write decorator-using code that will work with
     both Python 2.3 and 2.4 (and up).
     """
-
     if len(decorators)>1:
         decorators = list(decorators)
         decorators.reverse()
@@ -33,12 +31,14 @@ def decorate(*decorators):
         for d in decorators:
             v = d(v)
         return v
-
     return decorate_assignment(callback)
 
-
-
-
+def enclosing_frame(frame=None, level=3):
+    """Get an enclosing frame that skips DecoratorTools callback code"""
+    frame = frame or sys._getframe(level)
+    while frame.f_globals.get('__name__')==__name__: frame = frame.f_back
+    return frame
+    
 def name_and_spec(func):
     from inspect import formatargspec, getargspec
     funcname = func.__name__
@@ -353,7 +353,7 @@ def decorate_class(decorator, depth=2, frame=None, allow_duplicates=False):
     declare their ``__metaclass__`` (if any) *before* specifying any class
     decorators, to ensure that all class decorators will be applied."""
 
-    frame = frame or sys._getframe(depth)
+    frame = enclosing_frame(frame, depth+1)
     kind, module, caller_locals, caller_globals = frameinfo(frame)
 
     if kind != "class":
@@ -508,7 +508,7 @@ def decorate_assignment(callback, depth=2, frame=None):
     'None' or incorrect, if the 'value' is not the original function (e.g.
     when multiple decorators are used).
     """
-    frame = frame or sys._getframe(depth)
+    frame = enclosing_frame(frame, depth+1)
     oldtrace = [frame.f_trace]
     old_locals = frame.f_locals.copy()
 
