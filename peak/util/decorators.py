@@ -409,7 +409,7 @@ def metaclass_is_decorator(ob):
 
 
 def iter_class_decorators(depth=2, frame=None):
-    frame = frame or sys._getframe(depth)
+    frame = enclosing_frame(frame, depth+1)
     m = frame.f_locals.get('__metaclass__')
     while metaclass_is_decorator(m):
         yield getattr(m, 'callback', None)
