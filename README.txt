@@ -42,6 +42,11 @@ zope.interface, TurboGears, etc.
 
 For complete documentation, see the `DecoratorTools manual`_.
 
+Changes since version 1.5:
+
+  * Added ``classy`` base class that allows you to do the most often-needed
+    metaclass behviors *without* needing an actual metaclass.
+
 Changes since version 1.4:
 
   * Added ``enclosing_frame()`` function, so that complex decorators that call
@@ -594,6 +599,95 @@ decorate_assignment(callback [, depth=2, frame=None])
     is used with Python 2.4 ``@`` syntax, the callback `name` argument may be
     ``None`` or incorrect, if the `value` is not the original function (e.g.
     when multiple decorators are used).
+
+
+"Meta-less" Classes
+-------------------
+
+Sometimes, you want to create a base class in a library or program that will
+use the data defined in subclasses in some way, or that needs to customize
+the way instances are created (*without* overriding ``__new__``).
+
+Since Python 2.2, the standard way to accomplish these things is by creating
+a custom metaclass and overriding ``__new__``, ``__init__``, or ``__call__``.
+
+Unfortunately, however, metaclasses don't play well with others.  If two
+frameworks define independent metaclasses, and a library or application mixes
+classes from those frameworks, the user will have to create a *third* metaclass
+to sort out the differences.  For this reason, it's best to minimize the number
+of distinct metaclasses in use.
+
+``peak.util.decorators`` therefore provides a kind of "one-size-fits-all"
+metaclass, so that most of the common use cases for metaclasses can be handled
+with just one metaclass.  In PEAK and elsewhere, metaclasses are most commonly
+used to perform some sort of operations during class creation (metaclass
+``__new__`` and ``__init__``), or instance creation (metaclass ``__call__``,
+wrapping the class-level ``__new__`` and ``__init__``).
+
+Therefore, the ``classy`` base class allows subclasses to implement one or more
+of the three classmethods ``__class_new__``, ``__class_init__``, and
+``__class_call__``.  The "one-size-fits-all" metaclass delegates these
+operations to the class, so that you don't need a custom metaclass for every
+class with these behaviors.
+
+Thus, as long as all your custom metaclasses derive from ``classy.__class__``,
+you can avoid any metaclass conflicts during multiple inheritance.
+
+Here's an example of ``classy`` in use::
+
+    >>> from peak.util.decorators import classy, decorate
+
+    >>> class Demo(classy):
+    ...     """Look, ma!  No metaclass!"""
+    ...
+    ...     def __class_new__(meta, name, bases, cdict, supr):
+    ...         cls = supr()(meta, name, bases, cdict, supr)
+    ...         print "My metaclass is", meta
+    ...         print "And I am", cls
+    ...         return cls
+    ...
+    ...     def __class_init__(cls, name, bases, cdict, supr):
+    ...         supr()(cls, name, bases, cdict, supr)
+    ...         print "Initializing", cls
+    ...
+    ...     decorate(classmethod)   # could be just @classmethod for 2.4+
+    ...     def __class_call__(cls, *args, **kw):
+    ...         print "before creating instance"
+    ...         ob = super(Demo, cls).__class_call__(*args, **kw)
+    ...         print "after creating instance"
+    ...         return ob
+    ...
+    ...     def __new__(cls, *args, **kw):
+    ...         print "new called with", args, kw
+    ...         return super(Demo, cls).__new__(cls, *args, **kw)
+    ...
+    ...     def __init__(self, *args, **kw):
+    ...         print "init called with", args, kw
+    My metaclass is <class 'peak.util.decorators.classy_class'>
+    And I am <class 'Demo'>
+    Initializing <class 'Demo'>
+
+    >>> d = Demo(1,2,a="b")
+    before creating instance
+    new called with (1, 2) {'a': 'b'}
+    init called with (1, 2) {'a': 'b'}
+    after creating instance
+
+Note that because ``__class_new__`` and ``__class_init__`` are called *before*
+the name ``Demo`` has been bound to the class under creation, ``super()``
+cannot be used in these methods.  So, they use a special calling convention,
+where the last argument (``supr``) is the ``next()`` method of an iterator
+that yields base class methods in mro order.  In other words, calling
+``supr()(..., supr)`` invokes the previous definition of the method.  You MUST
+call this exactly *once* in your methods -- no more, no less.
+
+``__class_call__`` is different, because it is called after the class already
+exists.  Thus, it can be a normal ``classmethod`` and use ``super()`` in the
+standard way.
+
+Finally, note that any given ``classy`` subclass does NOT need to define all
+three methods; you can mix and match methods as needed.  Just be sure to always
+use the ``supr`` argument (or ``super()`` in the case of ``__class_call__``).
 
 
 Utility/Introspection Functions

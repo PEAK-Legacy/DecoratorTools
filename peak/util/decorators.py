@@ -3,7 +3,7 @@ import sys, os
 
 __all__ = [
     'decorate_class', 'metaclass_is_decorator', 'metaclass_for_bases',
-    'frameinfo', 'decorate_assignment', 'decorate', 'struct',
+    'frameinfo', 'decorate_assignment', 'decorate', 'struct', 'classy',
     'template_function', 'rewrap', 'cache_source', 'enclosing_frame',
 ]
 
@@ -38,7 +38,7 @@ def enclosing_frame(frame=None, level=3):
     frame = frame or sys._getframe(level)
     while frame.f_globals.get('__name__')==__name__: frame = frame.f_back
     return frame
-    
+
 def name_and_spec(func):
     from inspect import formatargspec, getargspec
     funcname = func.__name__
@@ -55,7 +55,7 @@ def qname(func):
 
 def apply_template(wrapper, func, *args, **kw):
     funcname, argspec  = name_and_spec(func)
-    wrapname, wrapspec = name_and_spec(wrapper)   
+    wrapname, wrapspec = name_and_spec(wrapper)
     body = wrapper.__doc__.replace('%','%%').replace('$args','%(argspec)s')
     d ={}
     body = """
@@ -66,7 +66,7 @@ def %(wrapname)s(%(wrapspec)s):
     body %= locals()
     filename = "<%s wrapping %s at 0x%08X>" % (qname(wrapper), qname(func), id(func))
     exec compile(body, filename, "exec") in func.func_globals, d
-    
+
     f = d[wrapname](func, *args, **kw)
     cache_source(filename, body, f)
 
@@ -125,14 +125,14 @@ if sys.version<"2.5":
     # We'll need this for monkeypatching linecache
     def checkcache(filename=None):
         """Discard cache entries that are out of date.
-        (This is not checked upon each call!)"""       
+        (This is not checked upon each call!)"""
         if filename is None:
             filenames = linecache.cache.keys()
         else:
             if filename in linecache.cache:
                 filenames = [filename]
             else:
-                return       
+                return
         for filename in filenames:
             size, mtime, lines, fullname = linecache.cache[filename]
             if mtime is None:
@@ -144,8 +144,8 @@ if sys.version<"2.5":
                 continue
             if size != stat.st_size or mtime != stat.st_mtime:
                 del linecache.cache[filename]
-        
-    
+
+
 def _cache_lines(filename, lines, owner=None):
     if owner is None:
         owner = filename
@@ -194,7 +194,7 @@ def template_function(wrapper=None):
     be passed in as arguments to the template function.
     """
     if wrapper is None:
-        return decorate_assignment(lambda f,k,v,o: template_function(v))       
+        return decorate_assignment(lambda f,k,v,o: template_function(v))
     return apply_template.__get__(wrapper)
 
 
@@ -566,6 +566,47 @@ def decorate_assignment(callback, depth=2, frame=None):
 
 
 
+
+
+
+
+
+
+def super_next(cls, attr):
+    for c in cls.__mro__:
+        if attr in c.__dict__:
+            yield getattr(c, attr).im_func
+
+class classy_class(type):
+    """Metaclass that delegates selected operations back to the class"""
+
+    def __new__(meta, name, bases, cdict):
+        cls = super(classy_class, meta).__new__(meta, name, bases, cdict)
+        supr = super_next(cls, '__class_new__').next
+        return supr()(meta, name, bases, cdict, supr)
+
+    def __init__(cls, name, bases, cdict):
+        supr = super_next(cls, '__class_init__').next
+        return supr()(cls, name, bases, cdict, supr)
+
+    def __call__(cls, *args, **kw):
+        return cls.__class_call__.im_func(cls, *args, **kw)
+
+
+class classy(object):
+    """Base class for classes that want to be their own metaclass"""
+    __metaclass__ = classy_class
+    __slots__ = ()
+
+    def __class_new__(meta, name, bases, cdict, supr):
+        return type.__new__(meta, name, bases, cdict)
+
+    def __class_init__(cls, name, bases, cdict, supr):
+        return type.__init__(cls, name, bases, cdict)
+
+    def __class_call__(cls, *args, **kw):
+        return type.__call__(cls, *args, **kw)
+    __class_call__ = classmethod(__class_call__)
 
 
 
