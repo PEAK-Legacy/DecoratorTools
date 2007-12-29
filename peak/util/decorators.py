@@ -1,10 +1,10 @@
 from types import ClassType, FunctionType
 import sys, os
-
 __all__ = [
     'decorate_class', 'metaclass_is_decorator', 'metaclass_for_bases',
     'frameinfo', 'decorate_assignment', 'decorate', 'struct', 'classy',
     'template_function', 'rewrap', 'cache_source', 'enclosing_frame',
+    'synchronized',
 ]
 
 def decorate(*decorators):
@@ -279,6 +279,47 @@ def struct(*mixins, **kw):
 
 
 
+
+
+
+
+
+
+def synchronized(func=None):
+    """Create a method synchronized by first argument's ``__lock__`` attribute
+
+    If the object has no ``__lock__`` attribute at run-time, the wrapper will
+    attempt to add one by creating a ``threading.RLock`` and adding it to the
+    object's ``__dict__``.  If ``threading`` isn't available, it will use a
+    ``dummy_threading.RLock`` instead.  Neither will be imported unless the
+    method is called on an object that doesn't have a ``__lock__``.
+
+    This decorator can be used as a standard decorator (e.g. ``@synchronized``)
+    or as a Python 2.3-compatible decorator by calling it with no arguments
+    (e.g. ``[synchronized()]``).
+    """
+    if func is None:
+        return decorate_assignment(lambda f,k,v,o: synchronized(v))
+
+    def wrap(__func):
+        '''
+        try:
+            lock = $self.__lock__
+        except AttributeError:
+            try:
+                from threading import RLock
+            except ImportError:
+                from dummy_threading import RLock
+            lock = $self.__dict__.setdefault('__lock__',RLock())
+        lock.acquire()
+        try:
+            return __func($args)
+        finally:
+            lock.release()'''
+    from inspect import getargspec
+    first_arg = getargspec(func)[0][0]
+    wrap.__doc__ = wrap.__doc__.replace('$self', first_arg)
+    return apply_template(wrap, func)
 
 
 

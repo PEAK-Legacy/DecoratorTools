@@ -42,6 +42,11 @@ zope.interface, TurboGears, etc.
 
 For complete documentation, see the `DecoratorTools manual`_.
 
+Changes since version 1.6:
+
+  * Added ``synchronized`` decorator to support locking objects during method
+    execution.
+
 Changes since version 1.5:
 
   * Added ``classy`` base class that allows you to do the most often-needed
@@ -179,7 +184,90 @@ decorate_class(decorator [, depth=2, frame=None])
         ...     do_hello()
         decorating __builtin__.Demo
         decorating __builtin__.Demo
+
     
+The ``synchronized`` Decorator
+------------------------------
+
+When writing multithreaded programs, it's often useful to define certain
+operations as being protected by a lock on an object.  The ``synchronized``
+decorator lets you do this by decorating object methods, e.g.::
+
+    >>> from peak.util.decorators import synchronized
+
+    >>> class TryingToBeThreadSafe(object):
+    ...     synchronized()      # could be just ``@synchronized`` for 2.4+
+    ...     def method1(self, arg):
+    ...         print "in method 1"
+    ...         self.method2()
+    ...         print "back in method 1"
+    ...         return arg
+    ...
+    ...     synchronized()      # could be just ``@synchronized`` for 2.4+
+    ...     def method2(self):
+    ...         print "in method 2"
+    ...         return 42
+
+    >>> TryingToBeThreadSafe().method1(99)
+    in method 1
+    in method 2
+    back in method 1
+    99
+
+What you can't tell from this example is that a ``__lock__`` attribute is being
+acquired and released around each of those calls.  Let's take a closer look::
+
+    >>> class DemoLock:
+    ...     def __init__(self, name):
+    ...         self.name = name
+    ...     def acquire(self):
+    ...         print "acquiring", self.name
+    ...     def release(self):
+    ...         print "releasing", self.name
+
+    >>> ts = TryingToBeThreadSafe()
+    >>> ts.__lock__ = DemoLock("lock 1")
+
+    >>> ts.method2()
+    acquiring lock 1
+    in method 2
+    releasing lock 1
+    42
+
+    >>> ts.method1(27)
+    acquiring lock 1
+    in method 1
+    acquiring lock 1
+    in method 2
+    releasing lock 1
+    back in method 1
+    releasing lock 1
+    27
+
+As you can see, if an object already has a ``__lock__`` attribute, its
+``acquire()`` and ``release()`` methods are called around the execution of the
+wrapped method.  (Note that this means the lock must be re-entrant: that is,
+you must use a ``threading.RLock`` or something similar to it, if you
+explicitly create your own ``__lock__`` attribute.)
+
+If the object has no ``__lock__``, the decorator creates a ``threading.RLock``
+and tries to add it to the object's ``__dict__``::
+
+    >>> del ts.__lock__
+
+    >>> ts.method1(27)
+    in method 1
+    in method 2
+    back in method 1
+    27
+
+    >>> ts.__lock__
+    <_RLock(None, 0)>
+
+(This means, by the way, that if you want to use synchronized methods on an
+object with no ``__dict__``, you must explicitly include a ``__lock__`` slot
+and initialize it yourself when the object is created.)
+
 
 The ``struct()`` Decorator
 --------------------------
