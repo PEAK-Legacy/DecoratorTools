@@ -1,10 +1,12 @@
-Class, Function, and Assignment Decorators for Python 2.3+
-==========================================================
+Class, Function, and Assignment Decorators, Metaclasses, and Related Tools
+==========================================================================
 
 Want to use decorators, but still need to support Python 2.3?  Wish you could
 have class decorators, decorate arbitrary assignments, or match decorated
-function signatures to their original functions?  Then you need
-"DecoratorTools".  Some quick examples::
+function signatures to their original functions?  Want to get metaclass
+features without creating metaclasses?  How about synchronized methods?
+
+"DecoratorTools" gets you all of this and more.  Some quick examples::
 
     # Method decorator example
     from peak.util.decorators import decorate
