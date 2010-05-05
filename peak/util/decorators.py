@@ -151,7 +151,7 @@ def rewrap(func, wrapper):
     to ``rewrap()``.
     """
     def rewrap(__original, __decorated):
-        """return __decorated($args)"""
+        return """return __decorated($args)"""
     return apply_template(rewrap, func, wrapper)
 
 
@@ -342,8 +342,11 @@ def synchronized(func=None):
     if func is None:
         return decorate_assignment(lambda f,k,v,o: synchronized(v))
 
+    from inspect import getargspec
+    first_arg = getargspec(func)[0][0]
+
     def wrap(__func):
-        '''
+        return '''
         try:
             lock = $self.__lock__
         except AttributeError:
@@ -356,12 +359,9 @@ def synchronized(func=None):
         try:
             return __func($args)
         finally:
-            lock.release()'''
-    from inspect import getargspec
-    first_arg = getargspec(func)[0][0]
-    wrap.__doc__ = wrap.__doc__.replace('$self', first_arg)
-    return apply_template(wrap, func)
+            lock.release()'''.replace('$self', first_arg)
 
+    return apply_template(wrap, func)
 
 
 
