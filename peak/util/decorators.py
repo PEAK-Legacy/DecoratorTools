@@ -52,19 +52,57 @@ def qname(func):
     m = func.__module__
     return m and m+'.'+func.__name__ or func.__name__
 
+class Bomb:
+    def __str__(self):
+        raise RuntimeError("template functions must return a static string!")
+bomb = Bomb()
+
+def getbody(func):
+    from inspect import getargspec
+    args, varargs, kwargs, defaults = getargspec(func)
+    return func(*[bomb] * len(args))
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def apply_template(wrapper, func, *args, **kw):
+
     funcname, argspec  = name_and_spec(func)
     wrapname, wrapspec = name_and_spec(wrapper)
-    body = wrapper.__doc__.replace('%','%%').replace('$args','%(argspec)s')
-    d ={}
+
+    body = wrapper.__doc__ or getbody(wrapper)
+    if not body:
+        raise RuntimeError(
+            "Missing docstring or empty return value from"
+            " %s(%s) - please switch the calling code from using docstrings"
+            " to return values" % (wrapname, wrapspec)
+        )
+
+    body = body.replace('%','%%').replace('$args','%(argspec)s')
     body = """
 def %(wrapname)s(%(wrapspec)s):
  def %(funcname)s(%(argspec)s): """+body+"""
  return %(funcname)s
 """
     body %= locals()
+    
     filename = "<%s wrapping %s at 0x%08X>" % (qname(wrapper), qname(func), id(func))
+    d ={}
     exec compile(body, filename, "exec") in func.func_globals, d
 
     f = d[wrapname](func, *args, **kw)
@@ -74,6 +112,9 @@ def %(wrapname)s(%(wrapspec)s):
     f.__doc__  = func.__doc__
     f.__dict__ = func.__dict__
     return f
+
+
+
 
 
 
@@ -618,7 +659,13 @@ def super_next(cls, attr):
         if attr in c.__dict__:
             yield getattr(c, attr).im_func
 
-class classy_class(type):
+# Python 2.6 and above mix ABCMeta into various random places  :-(
+try:
+    from abc import ABCMeta as base
+except ImportError:
+    base = type
+
+class classy_class(base):
     """Metaclass that delegates selected operations back to the class"""
 
     def __new__(meta, name, bases, cdict):
@@ -632,6 +679,21 @@ class classy_class(type):
 
     def __call__(cls, *args, **kw):
         return cls.__class_call__.im_func(cls, *args, **kw)
+
+    if base is not type:
+        # Our instances do not support ABC-ness
+        def register(*args): raise NotImplementedError
+        __instancecheck__ = type.__dict__['__instancecheck__']
+        __subclasscheck__ = type.__dict__['__subclasscheck__']
+
+
+
+
+
+
+
+
+
 
 
 class classy(object):
@@ -648,6 +710,27 @@ class classy(object):
     def __class_call__(cls, *args, **kw):
         return type.__call__(cls, *args, **kw)
     __class_call__ = classmethod(__class_call__)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

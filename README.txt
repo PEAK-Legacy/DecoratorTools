@@ -44,6 +44,17 @@ zope.interface, TurboGears, etc.
 
 For complete documentation, see the `DecoratorTools manual`_.
 
+Changes since version 1.7:
+
+  * The ``@template_function`` decorator now supports using a return value
+    instead of a docstring, in order to work with the "-OO" option to Python;
+    it's highly recommended that you update your template functions to use
+    a return value instead of a docstring.  (The error message has also been
+    improved for the missing docstring case.)
+
+  * Fixed metaclass collisions in ``classy`` subclasses that mix in abstract
+    classes (e.g. ``collections.Sequence``) in Python 2.6+.
+
 Changes since version 1.6:
 
   * Added ``synchronized`` decorator to support locking objects during method
@@ -514,12 +525,12 @@ to use it, the appropriate usage looks something like this::
     ...     def decorator(func):
     ...         [template_function()]   # could also be @template_function in 2.4
     ...         def before_and_after2(__func, __message):
-    ...             '''
-    ...             print "before", __message
-    ...             try:
-    ...                 return __func($args)
-    ...             finally:
-    ...                 print "after", __message
+    ...             return '''
+    ...                 print "before", __message
+    ...                 try:
+    ...                     return __func($args)
+    ...                 finally:
+    ...                     print "after", __message
     ...             '''
     ...         return before_and_after2(func, message)
     ...     return decorator
@@ -540,11 +551,38 @@ As you can see, the process is somewhat more complex.  Any values you wish
 the generated function to be able to access (aside from builtins) must be
 declared as arguments to the decorating function, and all arguments must be
 named so as not to conflict with the names of any of the decorated function's
-arguments.  The docstring must either fit on one line, or begin with a newline
-and have its contents indented by at least two spaces.  The string ``$args``
-may be used one or more times in the docstring, whenever calling the original
-function.  The first argument of the decorating function must always be the
-original function.
+arguments.
+
+The function template must return a static string that will be compiled into
+a new function by DecoratorTools.  The returned string must either fit on one
+line, or begin with a newline and have its contents indented by at least two
+spaces.  The string ``$args`` may be used one or more times in the returned
+string, whenever calling the original function.  The first argument of the
+decorating function must always be the original function.
+
+Note, however, that function template is only called *once*, in order to get
+this string, and it's called with dummy arguments.  So the function must not
+attempt to actually *use* any of its arguments, and must **always return a
+static string**.  Any attempt to insert the supplied arguments into the
+template will result in an error::
+
+    >>> def broken_decorator(func):
+    ...     [template_function()]
+    ...     def broken_template(__func, __message):
+    ...         # This doesn't work; don't do this:
+    ...         return '''
+    ...             print "before %(__message)s"
+    ...             try:
+    ...                 return __func($args)
+    ...             finally:
+    ...                 print "after %(__message)s"
+    ...         ''' % locals()
+    ...     return broken_template(func, "test")
+
+    >>> broken_decorator(foo)
+    Traceback (most recent call last):
+      ...
+    RuntimeError: template functions must return a static string!
 
 
 Debugging Generated Code
@@ -749,7 +787,7 @@ Here's an example of ``classy`` in use::
     ...
     ...     def __new__(cls, *args, **kw):
     ...         print "new called with", args, kw
-    ...         return super(Demo, cls).__new__(cls, *args, **kw)
+    ...         return super(Demo, cls).__new__(cls)
     ...
     ...     def __init__(self, *args, **kw):
     ...         print "init called with", args, kw

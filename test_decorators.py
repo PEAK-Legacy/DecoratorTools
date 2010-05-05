@@ -256,29 +256,29 @@ class ClassDecoratorTests(TestCase):
 
 
 
+class ClassyMetaTests(TestCase):
+    """Test subclass/instance checking of classy for Python 2.6+ ABC mixin"""
 
+    def setUp(self):
+        class x(classy): pass
+        class y(x): pass
+        class cc(type(classy)): pass
+        self.__dict__.update(locals())
 
+    def test_subclassing(self):
+        self.failUnless(issubclass(self.x, classy))
+        self.failUnless(issubclass(self.y, self.x))
+        self.failIf(issubclass(self.x, self.y))
+        self.failIf(issubclass(classy, self.x))
+        self.failIf(issubclass(self.x, type(classy)))
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    def test_instancing(self):
+        self.failIf(isinstance(self.x, classy))
+        self.failUnless(isinstance(self.x, type(classy)))
+        self.failIf(isinstance(self.x(), type(classy)))
+        self.failIf(isinstance(object, type(classy)))
+        self.failIf(isinstance(self.x(),self.y))
+        self.failUnless(isinstance(self.y(),self.x))
 
 
 
