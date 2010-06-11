@@ -597,7 +597,7 @@ def decorate_assignment(callback, depth=2, frame=None):
     def tracer(frm,event,arg):
         if event=='call':
             # We don't want to trace into any calls
-            if oldtrace[0]:
+            if oldtrace[0] is not None:
                 # ...but give the previous tracer a chance to, if it wants
                 return oldtrace[0](frm,event,arg)
             else:
@@ -615,24 +615,30 @@ def decorate_assignment(callback, depth=2, frame=None):
 
                 # Got it, fire the callback, then get the heck outta here...
                 frm.f_locals[k] = callback(frm,k,v,old_locals)
+                uninstall()
 
         finally:
             # Give the previous tracer a chance to run before we return
-            if oldtrace[0]:
+            if oldtrace[0] is not None:
                 # And allow it to replace our idea of the "previous" tracer
                 oldtrace[0] = oldtrace[0](frm,event,arg)
 
-        uninstall()
         return oldtrace[0]
 
     def uninstall():
         # Unlink ourselves from the trace chain.
         frame.f_trace = oldtrace[0]
-        sys.settrace(oldtrace[-1])
+        if installed:
+            sys.settrace(oldtrace[-1])
+            
 
     # Install the trace function
     frame.f_trace = tracer
-    sys.settrace(tracer)
+    if oldtrace[-1] is None:   # No need to change global if already tracing
+        sys.settrace(tracer)
+        installed = True
+    else:
+        installed = False
 
     def do_decorate(f):
         # Python 2.4 '@' compatibility; call the callback
@@ -643,12 +649,6 @@ def decorate_assignment(callback, depth=2, frame=None):
         )
 
     return do_decorate
-
-
-
-
-
-
 
 
 
