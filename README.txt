@@ -44,6 +44,15 @@ zope.interface, TurboGears, etc.
 
 For complete documentation, see the `DecoratorTools manual`_.
 
+Changes since version 1.8:
+
+  * The ``decorate_assignment`` decorator (and decorators based on it) are now
+    much more debugger- and coverage-tool friendly, as it no longer changes the
+    global trace hook if an active trace is detected.  (And under Python 2.6+,
+    an active global trace can be detected even if the frame-local trace is
+    None.)  This should be especially an improvement for tools that use
+    different callables for their local and global trace hooks.
+    
 Changes since version 1.7:
 
   * The ``@template_function`` decorator now supports using a return value
