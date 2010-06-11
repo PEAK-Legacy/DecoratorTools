@@ -62,11 +62,11 @@ def getbody(func):
     args, varargs, kwargs, defaults = getargspec(func)
     return func(*[bomb] * len(args))
     
-
-
-
-
-
+try:
+    from sys import gettrace
+    tracers_for = lambda f: [f.f_trace, gettrace()]
+except ImportError:
+    tracers_for = lambda f: [f.f_trace]
 
 
 
@@ -591,7 +591,7 @@ def decorate_assignment(callback, depth=2, frame=None):
     when multiple decorators are used).
     """
     frame = enclosing_frame(frame, depth+1)
-    oldtrace = [frame.f_trace]
+    oldtrace = tracers_for(frame)
     old_locals = frame.f_locals.copy()
 
     def tracer(frm,event,arg):
@@ -628,7 +628,7 @@ def decorate_assignment(callback, depth=2, frame=None):
     def uninstall():
         # Unlink ourselves from the trace chain.
         frame.f_trace = oldtrace[0]
-        sys.settrace(oldtrace[0])
+        sys.settrace(oldtrace[-1])
 
     # Install the trace function
     frame.f_trace = tracer
@@ -685,7 +685,6 @@ class classy_class(base):
         def register(*args): raise NotImplementedError
         __instancecheck__ = type.__dict__['__instancecheck__']
         __subclasscheck__ = type.__dict__['__subclasscheck__']
-
 
 
 
