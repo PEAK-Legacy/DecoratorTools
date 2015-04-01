@@ -284,7 +284,7 @@ and tries to add it to the object's ``__dict__``::
     27
 
     >>> ts.__lock__
-    <_RLock(None, 0)>
+    <_RLock...None...0...>
 
 (This means, by the way, that if you want to use synchronized methods on an
 object with no ``__dict__``, you must explicitly include a ``__lock__`` slot
