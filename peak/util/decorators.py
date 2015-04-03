@@ -204,14 +204,14 @@ def cache_source(filename, source, owner=None):
 
 
 def template_function(wrapper=None):
-    """Decorator that uses its wrapped function's docstring as a template
+    """Decorator that uses its wrapped function's return value as a template
 
     Example::
 
         def before_and_after(func):
             @template_function
             def wrap(__func, __message):
-                '''
+                return '''
                 print "before", __message
                 try:
                     return __func($args)
@@ -233,13 +233,13 @@ def template_function(wrapper=None):
     calling module, as it is compiled with the globals of the *wrapped*
     function!  Thus, any non-builtin values that you need in the wrapper should
     be passed in as arguments to the template function.
+
+    (Also, the body text must begin with a newline as shown, and be indented
+    at least 2 spaces.)
     """
     if wrapper is None:
         return decorate_assignment(lambda f,k,v,o: template_function(v))
     return apply_template.__get__(wrapper)
-
-
-
 
 
 
