@@ -14,7 +14,7 @@ features without creating metaclasses?  How about synchronized methods?
     class Demo1(object):
         decorate(classmethod)   # equivalent to @classmethod
         def example(cls):
-            print "hello from", cls
+            print("hello from "+repr(cls))
 
 
     # Class decorator example
@@ -22,7 +22,7 @@ features without creating metaclasses?  How about synchronized methods?
 
     def my_class_decorator():
         def decorator(cls):
-            print "decorating", cls
+            print("decorating "+repr(cls))
             return cls
         decorate_class(decorator)
 
@@ -157,13 +157,13 @@ decorate_class(decorator [, depth=2, frame=None])
 
         >>> def demo_class_decorator():
         ...     def decorator(cls):
-        ...         print "decorating", cls
+        ...         print("decorating "+repr(cls))
         ...         return cls
         ...     decorate_class(decorator)
 
         >>> class Demo:
         ...     demo_class_decorator()
-        decorating __builtin__.Demo
+        decorating <class __builtin__.Demo...>
 
     In the above example, ``demo_class_decorator()`` is the decorator factory
     function, and its inner function ``decorator`` is what gets called to
@@ -185,7 +185,7 @@ decorate_class(decorator [, depth=2, frame=None])
     Note, by the way that ``decorate_class()`` ignores duplicate callbacks::
 
         >>> def hello(cls):
-        ...     print "decorating", cls
+        ...     print("decorating "+repr(cls))
         ...     return cls
 
         >>> def do_hello():
@@ -194,7 +194,7 @@ decorate_class(decorator [, depth=2, frame=None])
         >>> class Demo:
         ...     do_hello()
         ...     do_hello()
-        decorating __builtin__.Demo
+        decorating <class __builtin__.Demo...>
 
     Unless the ``allow_duplicates`` argument is set to a true value::
 
@@ -204,8 +204,8 @@ decorate_class(decorator [, depth=2, frame=None])
         >>> class Demo:
         ...     do_hello()
         ...     do_hello()
-        decorating __builtin__.Demo
-        decorating __builtin__.Demo
+        decorating <class __builtin__.Demo...>
+        decorating <class __builtin__.Demo...>
 
     
 The ``synchronized`` Decorator
@@ -220,14 +220,14 @@ decorator lets you do this by decorating object methods, e.g.::
     >>> class TryingToBeThreadSafe(object):
     ...     synchronized()      # could be just ``@synchronized`` for 2.4+
     ...     def method1(self, arg):
-    ...         print "in method 1"
+    ...         print("in method 1")
     ...         self.method2()
-    ...         print "back in method 1"
+    ...         print("back in method 1")
     ...         return arg
     ...
     ...     synchronized()      # could be just ``@synchronized`` for 2.4+
     ...     def method2(self):
-    ...         print "in method 2"
+    ...         print("in method 2")
     ...         return 42
 
     >>> TryingToBeThreadSafe().method1(99)
@@ -243,9 +243,9 @@ acquired and released around each of those calls.  Let's take a closer look::
     ...     def __init__(self, name):
     ...         self.name = name
     ...     def acquire(self):
-    ...         print "acquiring", self.name
+    ...         print("acquiring "+self.name)
     ...     def release(self):
-    ...         print "releasing", self.name
+    ...         print("releasing "+self.name)
 
     >>> ts = TryingToBeThreadSafe()
     >>> ts.__lock__ = DemoLock("lock 1")
@@ -376,7 +376,7 @@ into the result tuple, e.g.::
 
 Internally, ``struct`` types are actually tuples::
 
-    >>> print tuple.__repr__(X(1,2,3))
+    >>> print(tuple.__repr__(X(1,2,3)))
     (<class 'X'>, 1, 2, 3)
 
 The internal representation contains the struct's type object, so that structs
@@ -413,7 +413,7 @@ docstring, etc.) that are created by the ``struct()`` decorator::
 
     >>> class Mixin(object):
     ...     __slots__ = []
-    ...     def foo(self): print "bar"
+    ...     def foo(self): print("bar")
 
     >>> def demo(a, b):
     ...     return a, b
@@ -458,11 +458,11 @@ results::
     >>> def before_and_after(message):
     ...     def decorator(func):
     ...         def decorated(*args, **kw):
-    ...             print "before", message
+    ...             print("before "+message)
     ...             try:
     ...                 return func(*args, **kw)
     ...             finally:
-    ...                 print "after", message
+    ...                 print("after "+message)
     ...         return decorated
     ...     return decorator
 
@@ -497,11 +497,11 @@ module, and other characteristics of the original function::
     >>> def before_and_after(message):
     ...     def decorator(func):
     ...         def before_and_after(*args, **kw):
-    ...             print "before", message
+    ...             print("before "+message)
     ...             try:
     ...                 return func(*args, **kw)
     ...             finally:
-    ...                 print "after", message
+    ...                 print("after "+ message)
     ...         return rewrap(func, before_and_after)
     ...     return decorator
 
@@ -535,11 +535,11 @@ to use it, the appropriate usage looks something like this::
     ...         [template_function()]   # could also be @template_function in 2.4
     ...         def before_and_after2(__func, __message):
     ...             return '''
-    ...                 print "before", __message
+    ...                 print("before "+__message)
     ...                 try:
     ...                     return __func($args)
     ...                 finally:
-    ...                     print "after", __message
+    ...                     print("after "+__message)
     ...             '''
     ...         return before_and_after2(func, message)
     ...     return decorator
@@ -580,11 +580,11 @@ template will result in an error::
     ...     def broken_template(__func, __message):
     ...         # This doesn't work; don't do this:
     ...         return '''
-    ...             print "before %(__message)s"
+    ...             print("before %(__message)s")
     ...             try:
     ...                 return __func($args)
     ...             finally:
-    ...                 print "after %(__message)s"
+    ...                 print("after %(__message)s")
     ...         ''' % locals()
     ...     return broken_template(func, "test")
 
@@ -615,7 +615,7 @@ functions compiled from strings...   or do they?  Let's see::
     ...         func(*args, **kw)
     ...     except:
     ...         import sys, traceback
-    ...         print ''.join(traceback.format_exception(*sys.exc_info()))
+    ...         print(''.join(traceback.format_exception(*sys.exc_info())))
 
     >>> call_and_print_error(before_and_after("error")(raiser), 99)
     before error
@@ -779,27 +779,27 @@ Here's an example of ``classy`` in use::
     ...
     ...     def __class_new__(meta, name, bases, cdict, supr):
     ...         cls = supr()(meta, name, bases, cdict, supr)
-    ...         print "My metaclass is", meta
-    ...         print "And I am", cls
+    ...         print("My metaclass is "+repr(meta))
+    ...         print("And I am "+repr(cls))
     ...         return cls
     ...
     ...     def __class_init__(cls, name, bases, cdict, supr):
     ...         supr()(cls, name, bases, cdict, supr)
-    ...         print "Initializing", cls
+    ...         print("Initializing "+repr(cls))
     ...
     ...     decorate(classmethod)   # could be just @classmethod for 2.4+
     ...     def __class_call__(cls, *args, **kw):
-    ...         print "before creating instance"
+    ...         print("before creating instance")
     ...         ob = super(Demo, cls).__class_call__(*args, **kw)
-    ...         print "after creating instance"
+    ...         print("after creating instance")
     ...         return ob
     ...
     ...     def __new__(cls, *args, **kw):
-    ...         print "new called with", args, kw
+    ...         print("new called with "+repr(args)+" "+repr(kw))
     ...         return super(Demo, cls).__new__(cls)
     ...
     ...     def __init__(self, *args, **kw):
-    ...         print "init called with", args, kw
+    ...         print("init called with "+repr(args)+" "+repr(kw))
     My metaclass is <class 'peak.util.decorators.classy_class'>
     And I am <class 'Demo'>
     Initializing <class 'Demo'>
