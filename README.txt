@@ -163,7 +163,7 @@ decorate_class(decorator [, depth=2, frame=None])
 
         >>> class Demo:
         ...     demo_class_decorator()
-        decorating <class __builtin__.Demo...>
+        decorating <class ...Demo...>
 
     In the above example, ``demo_class_decorator()`` is the decorator factory
     function, and its inner function ``decorator`` is what gets called to
@@ -194,7 +194,7 @@ decorate_class(decorator [, depth=2, frame=None])
         >>> class Demo:
         ...     do_hello()
         ...     do_hello()
-        decorating <class __builtin__.Demo...>
+        decorating <class ...Demo...>
 
     Unless the ``allow_duplicates`` argument is set to a true value::
 
@@ -204,8 +204,8 @@ decorate_class(decorator [, depth=2, frame=None])
         >>> class Demo:
         ...     do_hello()
         ...     do_hello()
-        decorating <class __builtin__.Demo...>
-        decorating <class __builtin__.Demo...>
+        decorating <class ...Demo...>
+        decorating <class ...Demo...>
 
     
 The ``synchronized`` Decorator
@@ -320,13 +320,13 @@ instances will look like a call to the original function::
     >>> help(X) # doctest: +NORMALIZE_WHITESPACE
     Help on class X:
     <BLANKLINE>
-    class X(__builtin__.tuple)
+    class X(...builtin...tuple)
      |  Demo type
      |
      |  Method resolution order:
      |      X
-     |      __builtin__.tuple
-     |      __builtin__.object
+     |      ...builtin...tuple
+     |      ...builtin...object
      |
      |  Methods defined here:
      |
@@ -424,7 +424,7 @@ docstring, etc.) that are created by the ``struct()`` decorator::
     >>> demo(3,4).reversed
     (4, 3)
     >>> demo.__mro__
-    (<class 'demo'>, <class ...Mixin...>, <type 'tuple'>, <type 'object'>)
+    (<class 'demo'>, <class ...Mixin...>, <... 'tuple'>, <... 'object'>)
 
 Note that using mixin classes will result in your new class' instances having
 a ``__dict__`` attribute, unless they are new-style classes that set
