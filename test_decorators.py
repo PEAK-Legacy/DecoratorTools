@@ -1,5 +1,6 @@
 from unittest import TestCase, makeSuite, TestSuite
 from peak.util.decorators import *
+from peak.util.decorators import with_metaclass
 import sys
 
 def ping(log, value):
@@ -19,7 +20,6 @@ def additional_tests():
         'README.txt',
         optionflags=doctest.ELLIPSIS|doctest.NORMALIZE_WHITESPACE,
     )
-
 
 
 
@@ -151,7 +151,7 @@ class FrameInfoTest(TestCase):
 
     def testClassExec(self):
         d = {'sys':sys, 'frameinfo':frameinfo}
-        exec "class Foo: info=frameinfo(sys._getframe())" in d
+        exec("class Foo: info=frameinfo(sys._getframe())", d)
         kind,module,f_locals,f_globals = d['Foo'].info
         assert kind=="class", kind
 
@@ -207,8 +207,7 @@ class ClassDecoratorTests(TestCase):
 
         class M(type): pass
 
-        class C(M):
-            __metaclass__ = M
+        class C(with_metaclass(M, M)):
             ping([],1)
 
         C, = C
@@ -220,8 +219,8 @@ class ClassDecoratorTests(TestCase):
         class M1(type): pass
         class M2(type): pass
 
-        class B1: __metaclass__ = M1
-        class B2: __metaclass__ = M2
+        class B1(with_metaclass(M1)): pass
+        class B2(with_metaclass(M2)): pass
 
         try:
             class C(B1,B2):
@@ -233,8 +232,7 @@ class ClassDecoratorTests(TestCase):
 
         class M3(M1,M2): pass
 
-        class C(B1,B2):
-            __metaclass__ = M3
+        class C(with_metaclass(M3,B1,B2)):
             ping([],1)
 
         assert isinstance(C,list)
@@ -244,20 +242,25 @@ class ClassDecoratorTests(TestCase):
 
 
 
+
+
     def testMetaOfClass(self):
 
         class metameta(type):
             pass
 
-        class meta(type):
-            __metaclass__ = metameta
+        class meta(with_metaclass(metameta, type)):
+            pass
 
         assert metaclass_for_bases((meta,type))==metameta
 
 
-
 class ClassyMetaTests(TestCase):
     """Test subclass/instance checking of classy for Python 2.6+ ABC mixin"""
+
+    # avert 3.2 warnings, but still work on 2.3(!)
+    failUnless = getattr(TestCase, 'assertTrue', TestCase.failUnless)
+    failIf = getattr(TestCase, 'assertFalse', TestCase.failIf)
 
     def setUp(self):
         class x(classy): pass
@@ -279,9 +282,6 @@ class ClassyMetaTests(TestCase):
         self.failIf(isinstance(object, type(classy)))
         self.failIf(isinstance(self.x(),self.y))
         self.failUnless(isinstance(self.y(),self.x))
-
-
-
 
 
 

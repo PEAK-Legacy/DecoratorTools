@@ -52,6 +52,10 @@ Changes since version 1.8:
     an active global trace can be detected even if the frame-local trace is
     None.)  This should be especially an improvement for tools that use
     different callables for their local and global trace hooks.
+
+  * DecoratorTools is now experimentally compatible with Python 3!  Thus far,
+    its tests run clean on Python 3.1 and 3.2; 3.3 through 3.5 haven't been
+    tested yet.  Please report any issues via the PEAK mailing list.
     
 Changes since version 1.7:
 

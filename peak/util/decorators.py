@@ -1,4 +1,4 @@
-from types import ClassType, FunctionType
+from types import FunctionType
 import sys, os
 __all__ = [
     'decorate_class', 'metaclass_is_decorator', 'metaclass_for_bases',
@@ -69,8 +69,49 @@ except ImportError:
     tracers_for = lambda f: [f.f_trace]
 
 
+def with_metaclass(meta, *bases):
+    """Python 2/3-compatible metaclass spelling; internal use only"""
+    class tmp(type):
+        def __new__(cls, name, _bases, cdict):
+            return meta(name, bases, cdict)
+    return type.__new__(tmp, 'tmp', (), {})
 
 
+
+
+
+try:
+    old_build_class = __build_class__
+except NameError:
+    # Python 2
+    from types import ClassType    
+    NEXT, GLOBALS, DEFAULTS = 'next', 'func_globals', 'func_defaults'
+else:
+    # Python 3
+    ClassType = type
+    NEXT, GLOBALS, DEFAULTS = '__next__', '__globals__', '__defaults__'
+    
+    def apply_decorators(cls, advice):
+        if metaclass_is_decorator(advice):
+            cls = advice.callback(
+                apply_decorators(cls, advice.previousMetaclass)
+            )
+        return cls
+            
+    def py3_build_class(func, name, *bases, **kw):
+        cls = old_build_class(func, name, *bases, **kw)
+        advice = cls.__dict__.get('__metaclass__', None)
+        decorated = apply_decorators(cls, advice)
+        if '__metaclass__' in cls.__dict__:
+            try:
+                del cls.__metaclass__
+            except TypeError:
+                pass
+        return decorated
+
+    getattr(__builtins__,'__dict__',__builtins__)[
+        '__build_class__'
+    ] = py3_build_class
 
 
 
@@ -103,12 +144,12 @@ def %(wrapname)s(%(wrapspec)s):
     
     filename = "<%s wrapping %s at 0x%08X>" % (qname(wrapper), qname(func), id(func))
     d ={}
-    exec compile(body, filename, "exec") in func.func_globals, d
+    exec(compile(body, filename, "exec"), getattr(func, GLOBALS), d)
 
     f = d[wrapname](func, *args, **kw)
     cache_source(filename, body, f)
 
-    f.func_defaults = func.func_defaults
+    setattr(f, DEFAULTS, getattr(func, DEFAULTS))
     f.__doc__  = func.__doc__
     f.__dict__ = func.__dict__
     return f
@@ -449,7 +490,7 @@ def decorate_class(decorator, depth=2, frame=None, allow_duplicates=False):
     defaultMetaclass  = caller_globals.get('__metaclass__', ClassType)
 
 
-    def advise(name,bases,cdict):
+    def advise(name,bases,cdict,**kw):
 
         if '__metaclass__' in cdict:
             del cdict['__metaclass__']
@@ -470,7 +511,7 @@ def decorate_class(decorator, depth=2, frame=None, allow_duplicates=False):
         else:
             meta = metaclass_for_bases(bases, previousMetaclass)
 
-        newClass = meta(name,bases,cdict)
+        newClass = meta(name,bases,cdict,**kw)
 
         # this lets the decorator replace the class completely, if it wants to
         return decorator(newClass)
@@ -657,7 +698,8 @@ def decorate_assignment(callback, depth=2, frame=None):
 def super_next(cls, attr):
     for c in cls.__mro__:
         if attr in c.__dict__:
-            yield getattr(c, attr).im_func
+            meth = getattr(c, attr) 
+            yield getattr(meth, 'im_func', meth)
 
 # Python 2.6 and above mix ABCMeta into various random places  :-(
 try:
@@ -670,15 +712,15 @@ class classy_class(base):
 
     def __new__(meta, name, bases, cdict):
         cls = super(classy_class, meta).__new__(meta, name, bases, cdict)
-        supr = super_next(cls, '__class_new__').next
+        supr = getattr(super_next(cls, '__class_new__'), NEXT)
         return supr()(meta, name, bases, cdict, supr)
 
     def __init__(cls, name, bases, cdict):
-        supr = super_next(cls, '__class_init__').next
+        supr = getattr(super_next(cls, '__class_init__'), NEXT)
         return supr()(cls, name, bases, cdict, supr)
 
     def __call__(cls, *args, **kw):
-        return cls.__class_call__.im_func(cls, *args, **kw)
+        return cls.__class_call__(*args, **kw)
 
     if base is not type:
         # Our instances do not support ABC-ness
@@ -694,10 +736,9 @@ class classy_class(base):
 
 
 
-
-class classy(object):
+class classy(with_metaclass(classy_class)):
     """Base class for classes that want to be their own metaclass"""
-    __metaclass__ = classy_class
+
     __slots__ = ()
 
     def __class_new__(meta, name, bases, cdict, supr):
@@ -708,8 +749,8 @@ class classy(object):
 
     def __class_call__(cls, *args, **kw):
         return type.__call__(cls, *args, **kw)
-    __class_call__ = classmethod(__class_call__)
 
+    __class_call__ = classmethod(__class_call__)
 
 
 
