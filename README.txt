@@ -283,8 +283,8 @@ and tries to add it to the object's ``__dict__``::
     back in method 1
     27
 
-    >>> ts.__lock__
-    <_RLock...None...0...>
+    >>> type(ts.__lock__)
+    <class '...thread...RLock'>
 
 (This means, by the way, that if you want to use synchronized methods on an
 object with no ``__dict__``, you must explicitly include a ``__lock__`` slot
@@ -399,7 +399,7 @@ access members directly, you must include the type entry, or use a slice::
     >>> a, b, c = X(1,2,3)  # wrong
     Traceback (most recent call last):
       ...
-    ValueError: too many values to unpack
+    ValueError: too many values to unpack...
 
     >>> t, a, b, c = X(1,2,3)       # right
     >>> a, b, c    = X(1,2,3)[1:]   # ok, if perhaps a bit unintuitive
