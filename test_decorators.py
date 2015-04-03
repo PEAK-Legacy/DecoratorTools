@@ -94,31 +94,31 @@ class DecoratorTests(TestCase):
         self.assertEqual(log, [(sys._getframe(),'foo',foo)])
 
     def testAlreadyTracing(self):
-        log = []
+        log = []; stk = []
+        fue = self.assertEqual.__name__ #['failUnlessEqual']
         def my_global_tracer(frm,event,arg):
-            log.append(frm.f_code.co_name)
+            if not stk: log.append(frm.f_code.co_name)
+            if frm.f_code.co_name==fue:
+                stk.append(frm)
             return my_local_tracer
-        def my_local_tracer(*args):
+        def my_local_tracer(frm, event, arg):
+            if event=='return' and stk and stk[-1] is frm:
+                stk.pop()
             return my_local_tracer
 
         sys.settrace(my_global_tracer)  # This is going to break your debugger!
         self.testAssignAdvice()
         sys.settrace(None)
-
         # And this part is going to fail if testAssignAdvice() or
         # decorate_assignment change much...
         self.assertEqual(log, [
             'testAssignAdvice',
-            'decorate_assignment', 'enclosing_frame', '<lambda>', 'failUnlessEqual',
-            'decorate_assignment', 'enclosing_frame', '<lambda>', 'failUnlessEqual',
+            'decorate_assignment', 'enclosing_frame', '<lambda>', fue,
+            'decorate_assignment', 'enclosing_frame', '<lambda>', fue,
             'decorate_assignment', 'enclosing_frame', '<lambda>',
-            'decorate_assignment', 'enclosing_frame', '<lambda>', 'failUnlessEqual',
+            'decorate_assignment', 'enclosing_frame', '<lambda>', fue,
         ])
             
-
-
-
-
 
 
 moduleLevelFrameInfo = frameinfo(sys._getframe())
